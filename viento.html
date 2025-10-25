@@ -1,29 +1,91 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <title>ImagePlayer</title>
-    <meta charset='utf-8' />
-    <script src='imageplayer.js'></script>
-  </head>
-  <body style='background-color: #ffffff;'>
-    <div id='ipDiv'></div>
-    <script>
-      // Generar un array con las imágenes desde 'prcp/1.jpg' hasta 'prcp/169.jpg'
-      var imagesArray = [];
-      for (var i = 1; i <= 168; i++) {
-        imagesArray.push('wind/' + i + '.jpg');
-      }
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Viento 10 m — 0–168</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{ --wrap-w:min(100%,1000px); --border:#e5e7eb; --text:#0f172a; --muted:#667085; --accent:#334155; }
+    body{ margin:0; background:#fff; color:var(--text); font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial; }
+    #ipWrap{ width:var(--wrap-w); aspect-ratio:12/4; margin:12px auto 0; border:1px solid var(--border); border-radius:12px; overflow:hidden; background:#fff; display:grid; place-items:center; box-shadow:0 6px 18px rgba(0,0,0,.06); }
+    #viewerImg{ width:100%; height:100%; object-fit:contain; display:block; background:#fff; }
+    .controls{ width:var(--wrap-w); margin:10px auto 18px; border:1px solid var(--border); border-radius:12px; padding:10px 12px; display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center; box-shadow:0 6px 18px rgba(0,0,0,.06); }
+    .btn{ appearance:none; border:1px solid var(--border); background:#f8fafc; color:var(--text); padding:.5rem .9rem; border-radius:999px; font-weight:600; cursor:pointer; }
+    .btn:hover{ background:#eef2f7; } .label{ font-variant-numeric:tabular-nums; color:var(--muted); font-weight:600; min-width:5ch; text-align:right; }
+    .range-wrap{ display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; }
+    input[type="range"]{ width:100%; appearance:none; height:6px; border-radius:999px; background:#e7edf5; outline:none; }
+    input[type="range"]::-webkit-slider-thumb{ appearance:none; width:18px; height:18px; border-radius:50%; background:var(--accent); border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.08); cursor:pointer; }
+    input[type="range"]::-moz-range-thumb{ width:18px; height:18px; border-radius:50%; background:var(--accent); border:2px solid #fff; cursor:pointer; }
+    @media (max-width:768px){ .controls{ grid-template-columns:1fr; gap:12px } .range-wrap{ grid-template-columns:1fr } .label{ text-align:center } }
+  </style>
+</head>
+<body>
+  <div class="controls">
+    <div class="group">
+      <button id="btnPrev" class="btn" type="button">⟨</button>
+      <button id="btnPlay" class="btn" type="button">▶︎</button>
+      <button id="btnNext" class="btn" type="button">⟩</button>
+    </div>
+    <div class="range-wrap">
+      <input id="frameRange" type="range" min="1" max="168" step="1" value="1" />
+      <div class="label"><span id="frameLabel">1</span>/168</div>
+    </div>
+    <div class="group">
+      <label for="speed" class="label" style="min-width:auto;">Vel:</label>
+      <select id="speed" class="btn">
+        <option value="1000">1x</option><option value="500">2x</option>
+        <option value="250" selected>4x</option><option value="150">6x</option>
+      </select>
+    </div>
+  </div>
 
-      ip = new ImagePlayer({
-        element: 'ipDiv',
-        images: imagesArray,
-        autoplay: 200,
-        interval: 200,
-        width : "500px",
-        height : "1000px",
-        icondir: './'
-      });
-    </script>
-  </body>
+  <div id="ipWrap">
+    <img id="viewerImg" alt="Mapa viento 10 m" src="wind/1.jpg">
+  </div>
+
+  <script>
+  (function(){
+    var minF=1,maxF=168,prefix='wind/',suffix='.jpg';
+    var idx=1, playing=false, speed=250, raf=null;
+    var img=document.getElementById('viewerImg');
+    var range=document.getElementById('frameRange');
+    var label=document.getElementById('frameLabel');
+    var btnPrev=document.getElementById('btnPrev');
+    var btnPlay=document.getElementById('btnPlay');
+    var btnNext=document.getElementById('btnNext');
+    var speedSel=document.getElementById('speed');
+
+    var cache=new Map(), MAX_CACHE=32, PRELOAD_AHEAD=16;
+    function src(i){ return prefix + i + suffix; }
+    function wrap(i){ if(i>maxF) return minF + (i-maxF-1); if(i<minF) return maxF - (minF-i-1); return i; }
+    function preload(i){
+      i=wrap(i); if(cache.has(i)) return cache.get(i);
+      var im=new Image(); im.decoding='async'; im.loading='eager'; im.src=src(i);
+      cache.set(i, im);
+      if(cache.size>MAX_CACHE){ let n=cache.size-MAX_CACHE; for(const k of cache.keys()){ if(n--<=0)break; if(k!==idx) cache.delete(k);} }
+      return im;
+    }
+    function warm(){ for(let k=1;k<=PRELOAD_AHEAD;k++) preload(idx+k); for(let k=1;k<=6;k++) preload(idx-k); }
+    function show(i){
+      idx=wrap(i); var im=preload(idx);
+      if (im.complete){ img.src=im.src; } else { im.decode?.().catch(()=>{}).finally(()=>{ img.src=im.src; }); }
+      range.value=idx; label.textContent=String(idx);
+    }
+    function step(d){ show(idx+d); }
+    function tick(t0){ if(!playing) return; var now=performance.now(); if(now-t0>=speed){ var nxt=wrap(idx+1); var im=preload(nxt); if(im.complete){ show(nxt); warm(); t0=now; } } raf=requestAnimationFrame(()=>tick(t0)); }
+    function play(){ if(playing) return; playing=true; btnPlay.textContent='⏸'; warm(); raf=requestAnimationFrame(()=>tick(performance.now())); }
+    function pause(){ playing=false; btnPlay.textContent='▶︎'; if(raf){ cancelAnimationFrame(raf); raf=null; } }
+
+    range.addEventListener('input', function(){ pause(); show(parseInt(this.value,10)); warm(); });
+    btnPrev.addEventListener('click', function(){ pause(); step(-1); warm(); });
+    btnNext.addEventListener('click', function(){ pause(); step(1); warm(); });
+    btnPlay.addEventListener('click', function(){ playing?pause():play(); });
+    speedSel.addEventListener('change', function(){ speed=parseInt(this.value,10)||1000; if(playing){ pause(); play(); } });
+    window.addEventListener('keydown', function(e){ if(['INPUT','SELECT'].includes(e.target?.tagName)) return; if(e.key==='ArrowLeft'){ pause(); step(-1); } if(e.key==='ArrowRight'){ pause(); step(1); } if(e.key===' '){ e.preventDefault(); playing?pause():play(); } });
+
+    show(idx); warm();
+  })();
+  </script>
+</body>
 </html>
 
