@@ -2,7 +2,11 @@
 (function () {
   // ===== Config de rutas =====
   // Si sirves el sitio en la raíz (http://localhost:8007/), deja absoluto:
-  const DATA_BASE  = '/data/meteogram';
+  const REPO = 'pronosticos_numericos';
+  const BASE = (location.pathname.startsWith('/' + REPO + '/')) ? ('/' + REPO) : '';
+  const DATA_BASE  = `${BASE}/data/meteogram`;
+  const MODEL_DIR  = 'wrf';
+  const CITIES_URL = `${DATA_BASE}/${MODEL_DIR}/cities.json`;
   const MODEL_DIR  = 'wrf';
   const CITIES_URL = `${DATA_BASE}/${MODEL_DIR}/cities.json`;
 
