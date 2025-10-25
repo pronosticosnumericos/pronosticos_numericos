@@ -1,0 +1,17 @@
+# Salidas y datos pesados
+*.nc
+*.grb
+*.grib
+wrfout_*
+*.pyc
+__pycache__/
+# Si no quieres versionar imágenes temporales, descomenta:
+# tmp/
+# prcp/
+# prcpacum/
+# prcpacum24h/
+# rh2m/
+# wind/
+# windsaffir/
+# Datos meteograma generados (si no quieres subirlos)
+# data/meteogram/wrf/*.json
