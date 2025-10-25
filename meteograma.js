@@ -1,16 +1,13 @@
 // meteograma.js
 (function () {
-  // ===== Config de rutas =====
-  // Si sirves el sitio en la raíz (http://localhost:8007/), deja absoluto:
+  // ===== Config de rutas (autodetecta si estás bajo /pronosticos_numericos/) =====
   const REPO = 'pronosticos_numericos';
-  const BASE = (location.pathname.startsWith('/' + REPO + '/')) ? ('/' + REPO) : '';
+  const BASE = location.pathname.startsWith('/' + REPO + '/') ? ('/' + REPO) : '';
   const DATA_BASE  = `${BASE}/data/meteogram`;
   const MODEL_DIR  = 'wrf';
   const CITIES_URL = `${DATA_BASE}/${MODEL_DIR}/cities.json`;
-  const MODEL_DIR  = 'wrf';
-  const CITIES_URL = `${DATA_BASE}/${MODEL_DIR}/cities.json`;
 
-  // ===== Referencias DOM =====
+  // ===== DOM =====
   const $ = (id) => document.getElementById(id);
   const PANEL = $('meteoPanel');
   const DD_CITY = $('citySelect');
@@ -28,11 +25,11 @@
 
   // ===== Estado =====
   let CITIES = [];
-  let LAST = null; // último dataset normalizado
+  let LAST = null;
 
   // ===== Utils =====
   function fmtDateRange(timestamps) {
-    if (!timestamps || !timestamps.length) return '—';
+    if (!timestamps?.length) return '—';
     const a = new Date(timestamps[0]);
     const b = new Date(timestamps[timestamps.length - 1]);
     const pad = (n) => String(n).padStart(2, '0');
@@ -44,14 +41,11 @@
     return CITIES.find(c => c.slug === slug) || CITIES[0];
   }
   function qsEncode(obj) {
-    const params = new URLSearchParams();
-    Object.keys(obj || {}).forEach(k => params.append(k, obj[k]));
-    return params.toString();
+    const p = new URLSearchParams();
+    Object.keys(obj || {}).forEach(k => p.append(k, obj[k]));
+    return p.toString();
   }
-  function isValidDateStr(s){
-    const d = new Date(s);
-    return !isNaN(d.getTime());
-  }
+  const isValidDateStr = (s) => !isNaN(new Date(s).getTime());
 
   // ===== Carga de datos =====
   async function fetchCityJson(slug) {
@@ -61,14 +55,24 @@
     return res.json();
   }
   async function loadCities() {
-    const res = await fetch(CITIES_URL, { cache: 'no-store' });
-    if (!res.ok) throw new Error('HTTP ' + res.status + ' al cargar cities.json');
-    CITIES = await res.json();
+    try {
+      const res = await fetch(CITIES_URL, { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      CITIES = await res.json();
+    } catch (e) {
+      console.warn('[meteograma] No se pudo cargar cities.json -> usando fallback:', e);
+      // Fallback mínimo (ajusta a tus ciudades reales)
+      CITIES = [
+        { name:'Ciudad de México', slug:'ciudad-de-mexico', lat:19.433, lon:-99.133 },
+        { name:'Veracruz', slug:'veracruz', lat:19.1738, lon:-96.1342 },
+        { name:'Guadalajara', slug:'guadalajara', lat:20.6736, lon:-103.344 }
+      ];
+    }
   }
 
   function normalizePayload(slug, raw) {
     const safe = (k, fb=[]) => Array.isArray(raw[k]) ? raw[k] : fb;
-    let ts = Array.isArray(raw.timestamps) ? raw.timestamps.filter(isValidDateStr) : [];
+    const ts = Array.isArray(raw.timestamps) ? raw.timestamps.filter(isValidDateStr) : [];
     const fb = findCityBySlug(slug) || {name: slug, lat: 0, lon: 0};
     const out = {
       city: raw.city ?? fb.name,
@@ -95,13 +99,14 @@
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, w, h);
   }
-  function drawAxes(ctx, w, h, padding) {
-    ctx.strokeStyle = '#e5e7eb';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(padding.l, padding.t, w - padding.l - padding.r, h - padding.t - padding.b);
+  function linMap(x, x0, x1, y0, y1) { return x1 === x0 ? y0 : y0 + (y1 - y0) * ((x - x0) / (x1 - x0)); }
+  function findMinMax(arr) {
+    let mn=+Infinity, mx=-Infinity;
+    for (const v of arr || []) { if(v<mn) mn=v; if(v>mx) mx=v; }
+    if (!isFinite(mn) || !isFinite(mx)) { mn=0; mx=1; }
+    if (mn===mx) { mn-=1; mx+=1; }
+    return [mn,mx];
   }
-  function linMap(x, x0, x1, y0, y1) { if (x1 === x0) return y0; return y0 + (y1 - y0) * ((x - x0) / (x1 - x0)); }
-  function findMinMax(arr) { let mn=+Infinity,mx=-Infinity; for (const v of arr){ if(v<mn)mn=v; if(v>mx)mx=v;} if(!isFinite(mn)||!isFinite(mx)){mn=0;mx=1;} if(mn===mx){mn-=1;mx+=1;} return [mn,mx]; }
   function drawLineSeries(ctx, xs, ys, color, rect) {
     const n = Math.min(xs.length, ys.length); if (n<=0) return;
     ctx.beginPath();
@@ -136,7 +141,7 @@
     });
   }
   function drawXLabels(ctx, rect, timestamps) {
-    if (!timestamps || !timestamps.length) return;
+    if (!timestamps?.length) return;
     if (isNaN(new Date(timestamps[0]).getTime())) return;
     const n = timestamps.length;
     const maxLabels = Math.max(3, Math.floor(rect.w / 90));
@@ -156,10 +161,8 @@
   function renderChart(canvas, data, opts) {
     if (!canvas) return;
     const dpr = Math.max(1, window.devicePixelRatio || 1);
-
     const cssW = canvas.clientWidth || 300;
     const cssH = canvas.clientHeight || 150;
-
     canvas.width  = Math.round(cssW * dpr);
     canvas.height = Math.round(cssH * dpr);
 
@@ -170,27 +173,26 @@
 
     clearCanvas(ctx, w, h);
 
-    const padding = { l: 42, r: -50, t: 8, b: 30 }; // más compacto aún
+    // ✔ NO usar padding negativo
+    const padding = { l: 42, r: 8, t: 8, b: 30 };
     const rect = { x: padding.l, y: padding.t, w: w - padding.l - padding.r, h: h - padding.t - padding.b };
 
+    // Marco
     ctx.strokeStyle = '#e5e7eb';
     ctx.lineWidth = 1;
     ctx.strokeRect(padding.l, padding.t, rect.w, rect.h);
 
     const ys = data.values || [];
-    const hasData = Array.isArray(ys) && ys.length > 0;
-    const [mn, mx] = (opts.lockMinMax && hasData) ? opts.lockMinMax : findMinMax(ys);
+    const [mn, mx] = (opts.lockMinMax && ys.length) ? opts.lockMinMax : findMinMax(ys);
     const view = { ...rect, yMin: mn, yMax: mx };
 
     drawYTicks(ctx, view, mn, mx, opts.unit);
-
     if (opts.type === 'bar') drawBars(ctx, data.timestamps || [], ys, opts.color || '#94a3b8', view);
     else drawLineSeries(ctx, data.timestamps || [], ys, opts.color || '#334155', view);
-
     drawXLabels(ctx, view, data.timestamps || []);
   }
 
-  // ===== UI: abrir/cerrar panel =====
+  // ===== UI panel =====
   function openPanel() { PANEL.classList.add('open'); }
   function closePanel() { PANEL.classList.remove('open'); }
   $('closeBtn')?.addEventListener('click', closePanel);
@@ -205,7 +207,7 @@
     });
   }
 
-  // ===== Cargar y pintar meteograma =====
+  // ===== Cargar y pintar =====
   async function loadAndRender(slug) {
     const raw = await fetchCityJson(slug);
     const dat = normalizePayload(slug, raw);
@@ -214,7 +216,6 @@
     TITLE.textContent = `Meteograma — ${dat.city}`;
     META.textContent  = `Lat ${(+dat.lat).toFixed(3)}, Lon ${(+dat.lon).toFixed(3)}`;
     RANGE_BADGE.textContent = fmtDateRange(dat.timestamps);
-
     LINK.href = `?${qsEncode({ model: MODEL_DIR, city: slug })}#meteograma`;
 
     renderChart(CANVAS.temp, {timestamps: dat.timestamps, values: dat.temp},   { unit:'°C',   type:'line', color:'#2563eb' });
@@ -233,8 +234,9 @@
 
   // ===== API pública & wiring =====
   window.Meteo = {
-    open: async function (slug = (CITIES[0]?.slug || 'ciudad-de-mexico')) {
+    open: async function (slug) {
       if (!CITIES.length) await loadCities();
+      if (!slug) slug = (CITIES[0]?.slug || 'ciudad-de-mexico');
       if (DD_CITY) DD_CITY.value = slug;
       openPanel();
       await loadAndRender(slug);
@@ -265,8 +267,11 @@
     }
 
     // Redibujar al cambiar tamaño/zoom
-    const ro = new ResizeObserver(() => rerenderFromLast());
-    ro.observe(document.getElementById('meteoPanel'));
+    const host = document.getElementById('meteoPanel');
+    if (host) {
+      const ro = new ResizeObserver(() => rerenderFromLast());
+      ro.observe(host);
+    }
     window.addEventListener('resize', rerenderFromLast);
     window.addEventListener('orientationchange', rerenderFromLast);
   });
