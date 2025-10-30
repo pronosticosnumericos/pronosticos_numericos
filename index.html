@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Pronósticos | GFS & WRF</title>
+  <title>Pronósticos | GFS, WRF & ECMWF-IFS</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     :root{
@@ -21,7 +21,7 @@
     .side-title{margin:0;font-weight:700;font-size:1.05rem}
     .side-section{padding:12px 10px}
     .label{font-size:.78rem;color:var(--muted);font-weight:700;margin:0 4px 6px 4px;text-transform:uppercase;letter-spacing:.04em}
-    .model-group{display:flex;gap:6px; padding:6px 8px;}
+    .model-group{display:flex;gap:6px; padding:6px 8px; flex-wrap:wrap;}
     .model-btn{ appearance:none; border:1px solid var(--border); background:#f8fafc; color:#1f2937; padding:.45rem .8rem; border-radius:999px; font-weight:700; font-size:.95rem; cursor:pointer; }
     .model-btn[aria-selected="true"]{ background:var(--accent); color:#fff; border-color:var(--accent); }
     .vars{display:grid; gap:6px; padding:6px 8px; overflow:auto}
@@ -36,13 +36,13 @@
     .viewer-card{
       position:relative; flex: 1 1 auto; height: calc(100vh - 240px); min-height: 520px;
       max-height: 1100px; border:1px solid var(--border); border-radius:12px; background:var(--panel);
-      box-shadow:0 10px 30px rgba(2,6,23,.06); display:flex; align-items:center; justify-content: cent; overflow:hidden;
+      box-shadow:0 10px 30px rgba(2,6,23,.06); display:flex; align-items:center; justify-content: center; overflow:hidden;
       padding: 0;
     }
     #viewerImg{ width:100%; height:100%; object-fit:contain; display:block; background:#fff; }
-    #viewerFrame{ display:none; } /* ya no usamos iframes para WRF */
+    #viewerFrame{ display:none; }
 
-    /* Controls siempre visibles */
+    /* Controls */
     .controls{
       display:grid; grid-template-columns:auto 1fr auto auto;
       gap:10px; align-items:center; border:1px solid var(--border); border-radius:12px;
@@ -94,8 +94,9 @@
       <div class="side-section">
         <div class="label">Modelo</div>
         <div class="model-group">
-          <button id="btn-gfs" class="model-btn" role="tab" aria-selected="true">GFS</button>
-          <button id="btn-wrf" class="model-btn" role="tab" aria-selected="false">WRF</button>
+          <button id="btn-gfs" class="model-btn" role="tab" aria-selected="false">GFS</button>
+          <button id="btn-wrf" class="model-btn" role="tab" aria-selected="true">WRF</button>
+          <button id="btn-ecmwf" class="model-btn" role="tab" aria-selected="false">ECMWF-IFS</button>
         </div>
       </div>
       <div class="side-section" style="flex:1 1 auto; overflow:auto">
@@ -113,7 +114,7 @@
         <iframe id="viewerFrame" title="Visor de variable"></iframe>
       </div>
 
-      <!-- Controles (siempre visibles) -->
+      <!-- Controles -->
       <div class="controls" id="controls">
         <div class="group">
           <button id="btnPrev" class="btn" type="button" aria-label="Anterior">⟨</button>
@@ -168,29 +169,42 @@
   <!-- Viewer -->
   <script>
   (function(){
-    // ===== Variables como SECUENCIAS (todas) =====
+    // ===== Configuración por modelo/variable =====
+    // type 'sequence': usa imágenes numeradas (start..start+count-1)
+    // prefix/suffix: ruta base + extensión (ej. '.png' o '.jpg')
     var CONFIG = {
       gfs: [
+        // Si tienes páginas HTML embebidas, déjalas con type:'page'
         { key:'precipitacion', label:'Precipitación hora', type:'page', page:'gfs/precipitacion.html', gfs:false },
         { key:'temperatura',   label:'Temperatura',       type:'page', page:'gfs/temperatura2.html', gfs:false },
       ],
       wrf: [
-        { key:'precipitacion',            label:'Precipitación hora',    type:'sequence', prefix:'prcp/',           suffix:'.jpg', count:168, start:1 },
-        { key:'precipitacionacumulada',   label:'Prec. acumulada',       type:'sequence', prefix:'prcpacum/',       suffix:'.jpg', count:168, start:1 },
-        { key:'precipitacionacumulada24h',label:'Prec. 24 h',            type:'sequence', prefix:'prcpacum24h/',    suffix:'.jpg', count:168, start:1 },
-        { key:'t2m',                      label:'Temperatura 2 m',       type:'sequence', prefix:'tmp/t2m',         suffix:'.jpg', count:168, start:1 },
-        { key:'viento',                   label:'Viento',                type:'sequence', prefix:'wind/',           suffix:'.jpg', count:168, start:1 },
-        { key:'humedadrelativa',          label:'Humedad rel.',          type:'sequence', prefix:'rh2m/',           suffix:'.jpg', count:168, start:1 },
-        { key:'saffirsimpson',            label:'Saffir-Simpson',        type:'sequence', prefix:'windsaffir/',     suffix:'.jpg', count:168, start:1 }
+        { key:'precipitacion',            label:'Precipitación hora',    type:'sequence', prefix:'prcp/',        suffix:'.jpg', count:168, start:1 },
+        { key:'precipitacionacumulada',   label:'Prec. acumulada',       type:'sequence', prefix:'prcpacum/',    suffix:'.jpg', count:168, start:1 },
+        { key:'precipitacionacumulada24h',label:'Prec. 24 h',            type:'sequence', prefix:'prcpacum24h/', suffix:'.jpg', count:168,   start:1 },
+        { key:'t2m',                      label:'Temperatura 2 m',       type:'sequence', prefix:'tmp/t2m',      suffix:'.jpg', count:168, start:1 },
+        { key:'viento',                   label:'Viento 10 m',           type:'sequence', prefix:'wind/',        suffix:'.jpg', count:168, start:1 },
+        { key:'humedadrelativa',          label:'Humedad rel.',          type:'sequence', prefix:'rh2m/',        suffix:'.jpg', count:168, start:1 },
+        { key:'saffirsimpson',            label:'Saffir-Simpson',        type:'sequence', prefix:'windsaffir/',  suffix:'.jpg', count:168, start:1 }
+      ],
+      ecmwf: [
+        // Secuencias numeradas (recomendado crear symlinks a tus archivos wx_*_H###.png)
+        { key:'tpInt',    label:'ECMWF • Prec. por intervalo', type:'sequence', prefix:'tpInt/',    suffix:'.png', count:48, start:1 },
+        { key:'tpTotal',  label:'ECMWF • Prec. acumulada',     type:'sequence', prefix:'tpTotal/',  suffix:'.png', count:48, start:1 },
+        { key:'tp24',     label:'ECMWF • Prec. 24 h',          type:'sequence', prefix:'tp24/',     suffix:'.png', count:48,   start:1 },
+        { key:'t2m',      label:'ECMWF • Temp. 2 m',           type:'sequence', prefix:'t2m/',      suffix:'.png', count:48, start:1 },
+        { key:'wind10',   label:'ECMWF • Viento 10 m',         type:'sequence', prefix:'wind10/',   suffix:'.png', count:48, start:1 }
       ]
     };
 
+    // ===== Estado global =====
     var currentModel = 'wrf';
-    var currentVarKey = 'precipitacion';
+    var currentVarKey = null;
 
     var varsWrap = document.getElementById('vars');
     var btnGFS = document.getElementById('btn-gfs');
     var btnWRF = document.getElementById('btn-wrf');
+    var btnEC = document.getElementById('btn-ecmwf');
 
     var img = document.getElementById('viewerImg');
     var frame = document.getElementById('viewerFrame');
@@ -205,11 +219,21 @@
 
     function updateStateLine(txt){ stateLine.textContent = txt; }
     function getVarList(model){ return CONFIG[model] || []; }
-    function getVar(model, key){ var list=getVarList(model); for (var i=0;i<list.length;i++) if (list[i].key===key) return list[i]; return list[0]||null; }
+    function getVar(model, key){
+      var list = getVarList(model);
+      if (!list.length) return null;
+      if (!key) return list[0];
+      for (var i=0;i<list.length;i++) if (list[i].key===key) return list[i];
+      return list[0];
+    }
 
     function renderVarButtons(){
       varsWrap.innerHTML = '';
       var list = getVarList(currentModel);
+      if (!list.length) return;
+      if (!currentVarKey || !list.some(function(v){return v.key===currentVarKey;})){
+        currentVarKey = list[0].key;
+      }
       list.forEach(function(v){
         var b = document.createElement('button');
         b.className = 'var-btn' + (v.key === currentVarKey ? ' active' : '');
@@ -231,7 +255,7 @@
     function seqSrc(i){ return seqCfg.prefix + i + (seqCfg.suffix||'.jpg'); }
     function seqUpdate(i){
       idx = i; img.src = seqSrc(idx); range.value = idx; label.textContent = String(idx);
-      prefetchNext(); // precarga siguiente tanda
+      prefetchNext();
     }
     function seqStep(d){ var n = idx + d; if (n > seqCfg.end) n = seqCfg.start; if (n < seqCfg.start) n = seqCfg.end; seqUpdate(n); }
     function seqPlay(){ if (playing) return; playing=true; btnPlay.textContent='⏸'; timer=setInterval(function(){ seqStep(1); }, speed); }
@@ -241,6 +265,8 @@
       var start = v.start || 1, count = v.count || 168;
       seqCfg = { prefix:v.prefix, suffix:v.suffix||'.jpg', start:start, end:start+count-1 };
       range.min = seqCfg.start; range.max = seqCfg.end; range.step = 1;
+      // si tp24 tiene otro número de frames, actualizamos el total mostrado
+      document.getElementById('frameLabel').nextSibling.nodeValue = '/' + (seqCfg.end - seqCfg.start + 1);
       idx = seqCfg.start; seqPause(); speed = parseInt(speedSel.value,10) || 1000; seqUpdate(idx);
     }
 
@@ -256,7 +282,7 @@
       if (e.key===' '){ e.preventDefault(); (playing?seqPause():seqPlay()); }
     });
 
-    // ===== Precarga simple para animación más fluida =====
+    // ===== Precarga simple =====
     var prefetch = { queue:[], cache:[], setSize:12 };
     function prefetchSet(start){
       prefetch.queue = [];
@@ -269,7 +295,6 @@
       if (!prefetch.queue.length || prefetch.queue.indexOf(seqSrc(nextStart)) === -1){
         prefetchSet(nextStart);
       }
-      // cargar de a 3
       for (var m=0; m<3 && prefetch.queue.length; m++){
         var u = prefetch.queue.shift();
         var im = new Image(); im.src = u; prefetch.cache.push(im);
@@ -281,22 +306,27 @@
     function render(){
       btnGFS.setAttribute('aria-selected', currentModel==='gfs');
       btnWRF.setAttribute('aria-selected', currentModel==='wrf');
+      btnEC.setAttribute('aria-selected',  currentModel==='ecmwf');
 
       var v = getVar(currentModel, currentVarKey);
       if (!v){ updateStateLine('Sin variable'); return; }
       updateStateLine('Modelo: ' + currentModel.toUpperCase() + ' • Variable: ' + v.label);
 
-      if (currentModel==='gfs' && v.gfs === false){
-        img.style.display='none'; frame.style.display='none';
+      if (v.type === 'page'){
+        seqPause();
+        img.style.display='none'; frame.style.display='block';
+        frame.src = v.page;
         return;
       }
       showSequence(v);
     }
 
-    btnGFS.addEventListener('click', function(){ currentModel='gfs'; renderVarButtons(); render(); });
-    btnWRF.addEventListener('click', function(){ currentModel='wrf'; renderVarButtons(); render(); });
+    // ===== Handlers modelo =====
+    btnGFS.addEventListener('click', function(){ currentModel='gfs'; currentVarKey=null; renderVarButtons(); render(); });
+    btnWRF.addEventListener('click', function(){ currentModel='wrf'; currentVarKey=null; renderVarButtons(); render(); });
+    btnEC.addEventListener('click',  function(){ currentModel='ecmwf'; currentVarKey=null; renderVarButtons(); render(); });
 
-    // Botón Meteograma: abre panel (ciudad por defecto)
+    // Botón Meteograma
     document.getElementById('openMeteograma').addEventListener('click', function(){
       if (window.Meteo && Meteo.open) Meteo.open('ciudad-de-mexico');
     });
