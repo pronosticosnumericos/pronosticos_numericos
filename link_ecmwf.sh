@@ -3,7 +3,7 @@
 set -euo pipefail
 
 SRC="/home/sig07/ECMWF/ecmwf_out/mex"
-DST="/home/sig07/pronosticos_numericos/"
+DST="/home/sig07/pronosticos_numericos"
 
 link_series () {
   local pattern="$1"   # ej. wx_tpInt_*_H*.png
@@ -12,7 +12,7 @@ link_series () {
   local n=1
   # Ordena por H###
   for f in $(ls -1 "$SRC"/$pattern 2>/dev/null | sort -tH -k2,2n); do
-    ln -sf "$f" "$outdir/$n.png"
+    cp -f "$f" "$outdir/$n.png"
     n=$((n+1))
   done
   echo "OK: $(basename "$outdir") → $((n-1)) frames"
