@@ -15,3 +15,5 @@ __pycache__/
 # windsaffir/
 # Datos meteograma generados (si no quieres subirlos)
 # data/meteogram/wrf/*.json
+prcp_matrix.json
+prcp/prcp_matrix.json
