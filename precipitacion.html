@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Precipitación por hora (WRF)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root{
+        --wrap-w: min(100%, 1100px);
+        --panel-bg: #ffffff;
+        --border: #e5e7eb;
+        --muted: #667085;
+        --text: #0f172a;
+        --accent: #334155;
+      }
+      body{ margin:0; background:#f5f6f8; color:var(--text); font:16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial; }
+
+      .controls{
+        width: var(--wrap-w);
+        margin: 14px auto 10px;
+        background: var(--panel-bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: 0 6px 18px rgba(0,0,0,.06);
+        padding: 10px 12px;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 10px; align-items: center;
+      }
+      .btn{
+        appearance:none; border:1px solid var(--border);
+        background:#f8fafc; color:var(--text);
+        padding:.5rem .9rem; border-radius:999px; font-weight:600; cursor:pointer;
+      }
+      .btn:hover{ background:#eef2f7; }
+      .label{ font-variant-numeric:tabular-nums; color:var(--muted); font-weight:600; min-width:5ch; text-align:right; }
+      .range-wrap{ display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; }
+      input[type="range"]{ width:100%; appearance:none; height:6px; border-radius:999px; background:#e7edf5; outline:none; }
+      input[type="range"]::-webkit-slider-thumb{
+        appearance:none; width:18px; height:18px; border-radius:50%;
+        background:var(--accent); border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.08); cursor:pointer;
+      }
+      input[type="range"]::-moz-range-thumb{
+        width:18px; height:18px; border-radius:50%; background:var(--accent); border:2px solid #fff; cursor:pointer;
+      }
+
+      #ipWrap{
+        width: var(--wrap-w);
+        aspect-ratio: 16/9;        /* ajusta si tus mapas no son 16:9 */
+        margin: 0 auto 16px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        background: #fff;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+        display: grid; place-items: center;
+      }
+      #viewerImg{
+        width:100%; height:100%; object-fit:contain; display:block; background:#fff;
+      }
+
+      @media (max-width: 768px){
+        .controls{ grid-template-columns:1fr; gap:12px; }
+        .label{ text-align:center; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="controls">
+      <div class="group">
+        <button id="btnPrev" class="btn" type="button" aria-label="Anterior">⟨</button>
+        <button id="btnPlay" class="btn" type="button" aria-label="Reproducir/Pausar">▶︎</button>
+        <button id="btnNext" class="btn" type="button" aria-label="Siguiente">⟩</button>
+      </div>
+      <div class="range-wrap">
+        <input id="frameRange" type="range" min="1" max="168" step="1" value="1" aria-label="Frame (1-168)">
+        <div class="label"><span id="frameLabel">1</span>/168</div>
+      </div>
+      <div class="group">
+        <label for="speed" class="label" style="min-width:auto;">Vel:</label>
+        <select id="speed" class="btn" aria-label="Velocidad">
+          <option value="800">1x</option>
+          <option value="400">2x</option>
+          <option value="250">4x</option>
+          <option value="150">6x</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="ipWrap">
+      <img id="viewerImg" alt="Precipitación hora" src="prcp/1.jpg" loading="eager">
+    </div>
+
+    <script>
+      (function(){
+        // Config (ajusta si usas 0..167 o 1..168)
+        var minF = 1, maxF = 168, prefix = 'prcp/', suffix = '.jpg';
+        var idx = 1, timer = null, playing = false, speed = 800;
+
+        var img = document.getElementById('viewerImg');
+        var range = document.getElementById('frameRange');
+        var label = document.getElementById('frameLabel');
+        var btnPrev = document.getElementById('btnPrev');
+        var btnPlay = document.getElementById('btnPlay');
+        var btnNext = document.getElementById('btnNext');
+        var speedSel= document.getElementById('speed');
+
+        function srcFor(i){ return prefix + i + suffix; }
+
+        // preload ligero (siguiente y anterior) para suavizar animación en GitHub Pages
+        var preloader = new Image();
+        function preloadNext(n){
+          var next = n + 1; if (next > maxF) next = minF;
+          preloader.src = srcFor(next);
+        }
+
+        function updateImage(i){
+          idx = i;
+          var s = srcFor(idx);
+          if (img.dataset.src !== s) { img.src = s; img.dataset.src = s; }
+          range.value = idx;
+          label.textContent = String(idx);
+          preloadNext(idx);
+        }
+
+        function step(delta){
+          var next = idx + delta;
+          if (next > maxF) next = minF;
+          if (next < minF) next = maxF;
+          updateImage(next);
+        }
+
+        function play(){
+          if (playing) return;
+          playing = true;
+          btnPlay.textContent = '⏸';
+          timer = setInterval(function(){ step(1); }, speed);
+        }
+
+        function pause(){
+          playing = false;
+          btnPlay.textContent = '▶︎';
+          if (timer){ clearInterval(timer); timer = null; }
+        }
+
+        range.addEventListener('input', function(){ pause(); updateImage(parseInt(this.value, 10)); });
+        btnPrev.addEventListener('click', function(){ pause(); step(-1); });
+        btnNext.addEventListener('click', function(){ pause(); step(1); });
+        btnPlay.addEventListener('click', function(){ playing ? pause() : play(); });
+
+        speedSel.addEventListener('change', function(){
+          speed = parseInt(this.value, 10) || 800;
+          if (playing){ pause(); play(); }
+        });
+
+        // teclado
+        window.addEventListener('keydown', function(e){
+          if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) return;
+          if (e.key === 'ArrowLeft'){ pause(); step(-1); }
+          if (e.key === 'ArrowRight'){ pause(); step(1); }
+          if (e.key === ' '){ e.preventDefault(); (playing ? pause() : play()); }
+        });
+
+        // inicio
+        updateImage(idx);
+      })();
+    </script>
+  </body>
+</html>
