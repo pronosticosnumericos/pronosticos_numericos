@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Pronósticos | GFS, WRF & ECMWF-IFS</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#f5f6f8; --panel:#fff; --text:#0f172a; --muted:#667085;
+      --accent:#334155; --border:#e5e7eb; --sidebar-w: 260px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial}
+
+    .app{ display:grid; grid-template-columns: var(--sidebar-w) 1fr; grid-template-rows: 100vh; }
+
+    /* Sidebar */
+    .sidebar{ background: var(--panel); border-right:1px solid var(--border); display:flex; flex-direction:column; min-width: 220px; }
+    .side-head{padding:12px 14px;border-bottom:1px solid var(--border)}
+    .side-title{margin:0;font-weight:700;font-size:1.05rem}
+    .side-section{padding:12px 10px}
+    .label{font-size:.78rem;color:var(--muted);font-weight:700;margin:0 4px 6px 4px;text-transform:uppercase;letter-spacing:.04em}
+    .model-group{display:flex;gap:6px; padding:6px 8px; flex-wrap:wrap;}
+    .model-btn{ appearance:none; border:1px solid var(--border); background:#f8fafc; color:#1f2937; padding:.45rem .8rem; border-radius:999px; font-weight:700; font-size:.95rem; cursor:pointer; }
+    .model-btn[aria-selected="true"]{ background:var(--accent); color:#fff; border-color:var(--accent); }
+    .vars{display:grid; gap:6px; padding:6px 8px; overflow:auto}
+    .var-btn{ width:100%; text-align:left; appearance:none; border:1px solid var(--border); background:#fff; color:#1f2937; padding:.5rem .6rem; border-radius:10px; font-weight:600; font-size:.95rem; cursor:pointer; }
+    .var-btn.active{ background:#111827; color:#fff; border-color:#111827; }
+
+    /* Main panel */
+    .main{ display:flex; flex-direction:column; height:100vh; padding:10px 12px 12px; gap:10px; }
+    .topline{font-size:.9rem;color:var(--muted); padding:2px 2px 4px}
+
+    /* Viewer */
+    .viewer-card{
+      position:relative; flex: 1 1 auto; height: calc(100vh - 240px); min-height: 520px;
+      max-height: 1100px; border:1px solid var(--border); border-radius:12px; background:var(--panel);
+      box-shadow:0 10px 30px rgba(2,6,23,.06); display:flex; align-items:center; justify-content: center; overflow:hidden;
+      padding: 0;
+    }
+    #viewerImg{ width:100%; height:100%; object-fit:contain; display:block; background:#fff; }
+    #viewerFrame{ display:none; }
+
+    /* Controls */
+    .controls{
+      display:grid; grid-template-columns:auto 1fr auto auto;
+      gap:10px; align-items:center; border:1px solid var(--border); border-radius:12px;
+      background:var(--panel); padding:6px 10px; box-shadow:0 6px 18px rgba(0,0,0,.06);
+    }
+    .group{display:flex; gap:6px; align-items:center}
+    .btn{ appearance:none; border:1px solid var(--border); background:#f8fafc; color:#1f2937; padding:.45rem .8rem; border-radius:999px; font-weight:700; font-size:.95rem; cursor:pointer; }
+    .btn:hover{ background:#eef2f7 }
+    .label{font-variant-numeric:tabular-nums}
+    input[type="range"]{ width:100%; appearance:none; height:6px; border-radius:999px; background:#e7edf5; outline:none; }
+    input[type="range"]::-webkit-slider-thumb{ appearance:none; width:18px; height:18px; border-radius:50%; background:var(--accent); border:2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.08); cursor:pointer; }
+    input[type="range"]::-moz-range-thumb{ width:18px; height:18px; border-radius:50%; background:var(--accent); border:2px solid #fff; cursor:pointer; }
+
+    @media (max-width: 880px){ :root{ --sidebar-w: 220px; } .var-btn, .model-btn, .btn{ font-size:.9rem } }
+    @media (max-width: 700px){
+      .app{ grid-template-columns: 1fr; grid-template-rows:auto auto 1fr; }
+      .sidebar{ grid-row:1; border-right:none; border-bottom:1px solid var(--border); }
+      .main{ grid-row:2 / span 2; }
+    }
+
+    /* ===== Meteograma (panel lateral) ===== */
+    .meteo-panel{
+      position: fixed; inset: 0 0 0 auto; width: min(760px, 98vw);
+      background: #fff; color: var(--text); border-left: 1px solid var(--border);
+      box-shadow: -12px 0 30px rgba(2,6,23,.12); transform: translateX(100%); transition: transform .28s ease;
+      display:flex; flex-direction:column; z-index: 50;
+    }
+    .meteo-panel.open{ transform: translateX(0); }
+    .meteo-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border-bottom:1px solid var(--border); }
+    .meteo-title{ margin:0; font-size:1.05rem }
+    .meteo-body{ padding:12px; overflow:auto; display:grid; gap:12px; grid-auto-rows:minmax(220px, auto); }
+    .meteo-body .card{ border:1px solid var(--border); border-radius:12px; background:#fff; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,.06); }
+    .meteo-body .card h4{ margin:0 0 6px; font-size:.98rem; color:#111827 }
+    .meteo-body .cwrap { width: 100%; }
+    .meteo-body canvas { width: 100% !important; height: 100% !important; display:block; }
+    .cwrap{ width:100%; height: clamp(240px, 38vh, 420px); }
+    .meteo-foot{ padding:10px 12px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .pill{ background:#f1f5f9; color:#0f172a; border:1px solid #e2e8f0; border-radius:999px; padding:.3rem .6rem; font-size:.85rem; }
+    .link{ color:#334155; text-decoration:underline; font-weight:600 }
+    .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    select.city{border:1px solid var(--border); border-radius:10px; padding:.45rem .6rem; background:#fff; font-weight:600}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar" role="navigation" aria-label="Selector de modelo y variable">
+      <div class="side-head"><h2 class="side-title">Pronósticos Numéricos</h2></div>
+      <div class="side-section">
+        <div class="label">Modelo</div>
+        <div class="model-group">
+          <button id="btn-gfs" class="model-btn" role="tab" aria-selected="false">GFS</button>
+          <button id="btn-wrf" class="model-btn" role="tab" aria-selected="true">WRF</button>
+          <button id="btn-ecmwf" class="model-btn" role="tab" aria-selected="false">ECMWF-IFS</button>
+        </div>
+      </div>
+      <div class="side-section" style="flex:1 1 auto; overflow:auto">
+        <div class="label">Variables</div>
+        <div id="vars" class="vars"></div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <div class="topline" id="stateLine">Listo</div>
+
+      <div class="viewer-card" id="viewerCard">
+        <img id="viewerImg" alt="Mapa pronóstico">
+        <iframe id="viewerFrame" title="Visor de variable"></iframe>
+      </div>
+
+      <!-- Controles -->
+      <div class="controls" id="controls">
+        <div class="group">
+          <button id="btnPrev" class="btn" type="button" aria-label="Anterior">⟨</button>
+          <button id="btnPlay" class="btn" type="button" aria-label="Reproducir/Pausar">▶︎</button>
+          <button id="btnNext" class="btn" type="button" aria-label="Siguiente">⟩</button>
+        </div>
+        <div class="group" style="gap:10px; flex:1 1 auto;">
+          <input id="frameRange" type="range" min="1" max="168" step="1" value="1" aria-label="Frame (1-168)" />
+          <div class="label"><span id="frameLabel">1</span>/168</div>
+        </div>
+        <div class="group">
+          <label for="speed" class="label" style="min-width:auto;">Vel:</label>
+          <select id="speed" class="btn" aria-label="Velocidad">
+            <option value="1000">1x</option>
+            <option value="500">2x</option>
+            <option value="250">4x</option>
+            <option value="150">6x</option>
+          </select>
+        </div>
+        <div class="group">
+          <button id="openMeteograma" class="btn" type="button">📈 Meteograma</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ===== Panel lateral METEOGRAMA ===== -->
+  <aside id="meteoPanel" class="meteo-panel" aria-label="Meteograma">
+    <div class="meteo-head">
+      <div class="row">
+        <h3 class="meteo-title" id="mtTitle" style="margin-right:6px">Meteograma</h3>
+        <select id="citySelect" class="city" title="Ciudad"></select>
+        <small id="mtMeta" class="pill"></small>
+      </div>
+      <button class="close btn" id="closeBtn">Cerrar</button>
+    </div>
+    <div class="meteo-body">
+      <div class="card"><h4>Temperatura 2 m (°C)</h4><div class="cwrap"><canvas id="cTemp"></canvas></div></div>
+      <div class="card"><h4>Precipitación (mm/h)</h4><div class="cwrap"><canvas id="cPpn"></canvas></div></div>
+      <div class="card"><h4>Viento 10 m (km/h)</h4><div class="cwrap"><canvas id="cWind"></canvas></div></div>
+      <div class="card"><h4>Humedad relativa (%)</h4><div class="cwrap"><canvas id="cRh"></canvas></div></div>
+    </div>
+    <div class="meteo-foot">
+      <span class="pill" id="mtRange">—</span>
+      <a class="link" id="deepLink" href="#">Compartir</a>
+    </div>
+  </aside>
+
+  <!-- meteograma -->
+  <script src="meteograma.js" defer></script>
+
+  <!-- ==== BASE prefix (subpath) ==== -->
+  <script>
+    // Cambia 'pronosticos_numericos' si tu repo se llama distinto (para GitHub Pages)
+    var REPO = 'pronosticos_numericos';
+    var BASE = location.pathname.startsWith('/'+REPO+'/') ? ('/'+REPO) : '';
+  </script>
+
+  <!-- Viewer -->
+  <script>
+  (function(){
+    // ===== Configuración por modelo/variable =====
+    // type 'sequence': usa imágenes numeradas (start..start+count-1)
+    // prefix/suffix: ruta base + extensión (ej. '.png' o '.jpg')
+    var CONFIG = {
+      gfs: [
+        { key:'precipitacion', label:'Precipitación hora', type:'page', page: BASE + '/gfs/precipitacion.html', gfs:false },
+        { key:'temperatura',   label:'Temperatura',       type:'page', page: BASE + '/gfs/temperatura2.html',   gfs:false },
+      ],
+      wrf: [
+        { key:'precipitacion',            label:'Precipitación hora',    type:'sequence', prefix: BASE + '/prcp/',        suffix:'.jpg', count:168, start:1 },
+        { key:'precipitacionacumulada',   label:'Prec. acumulada',       type:'sequence', prefix: BASE + '/prcpacum/',    suffix:'.jpg', count:168, start:1 },
+        { key:'precipitacionacumulada24h',label:'Prec. 24 h',            type:'sequence', prefix: BASE + '/prcpacum24h/', suffix:'.jpg', count:168, start:1 },
+        { key:'t2m',                      label:'Temperatura 2 m',       type:'sequence', prefix: BASE + '/tmp/t2m',      suffix:'.jpg', count:168, start:1 },
+        { key:'viento',                   label:'Viento 10 m',           type:'sequence', prefix: BASE + '/wind/',        suffix:'.jpg', count:168, start:1 },
+        { key:'humedadrelativa',          label:'Humedad rel.',          type:'sequence', prefix: BASE + '/rh2m/',        suffix:'.jpg', count:168, start:1 },
+        { key:'saffirsimpson',            label:'Saffir-Simpson',        type:'sequence', prefix: BASE + '/windsaffir/',  suffix:'.jpg', count:168, start:1 }
+      ],
+      ecmwf: [
+        // Si usas link_ecmwf.sh que renumera a 1.png..N.png en el raíz del sitio:
+        { key:'tpInt',    label:'ECMWF • Prec. por intervalo', type:'sequence', prefix: BASE + '/tpInt/',   suffix:'.png', count:49, start:1 },
+        { key:'tpTotal',  label:'ECMWF • Prec. acumulada',     type:'sequence', prefix: BASE + '/tpTotal/', suffix:'.png', count:49, start:1 },
+        // tp24: número de frames variable → count=null (se detecta solo)
+        { key:'tp24',     label:'ECMWF • Prec. 24 h',          type:'sequence', prefix: BASE + '/tp24/',    suffix:'.png', count:null, start:1 },
+        { key:'t2m',      label:'ECMWF • Temp. 2 m',           type:'sequence', prefix: BASE + '/t2m/',     suffix:'.png', count:49, start:1 },
+        { key:'wind10',   label:'ECMWF • Viento 10 m',         type:'sequence', prefix: BASE + '/wind10/',  suffix:'.png', count:49, start:1 }
+      ]
+    };
+
+    // ===== Estado global =====
+    var currentModel = 'wrf';
+    var currentVarKey = null;
+
+    var varsWrap = document.getElementById('vars');
+    var btnGFS = document.getElementById('btn-gfs');
+    var btnWRF = document.getElementById('btn-wrf');
+    var btnEC = document.getElementById('btn-ecmwf');
+
+    var img = document.getElementById('viewerImg');
+    var frame = document.getElementById('viewerFrame');
+    var stateLine = document.getElementById('stateLine');
+
+    var btnPrev = document.getElementById('btnPrev');
+    var btnPlay = document.getElementById('btnPlay');
+    var btnNext = document.getElementById('btnNext');
+    var range = document.getElementById('frameRange');
+    var label = document.getElementById('frameLabel');
+    var speedSel = document.getElementById('speed');
+
+    function updateStateLine(txt){ stateLine.textContent = txt; }
+    function getVarList(model){ return CONFIG[model] || []; }
+    function getVar(model, key){
+      var list = getVarList(model);
+      if (!list.length) return null;
+      if (!key) return list[0];
+      for (var i=0;i<list.length;i++) if (list[i].key===key) return list[i];
+      return list[0];
+    }
+
+    function renderVarButtons(){
+      varsWrap.innerHTML = '';
+      var list = getVarList(currentModel);
+      if (!list.length) return;
+      if (!currentVarKey || !list.some(function(v){return v.key===currentVarKey;})){
+        currentVarKey = list[0].key;
+      }
+      list.forEach(function(v){
+        var b = document.createElement('button');
+        b.className = 'var-btn' + (v.key === currentVarKey ? ' active' : '');
+        b.textContent = v.label;
+        b.setAttribute('data-key', v.key);
+        b.addEventListener('click', function(){
+          currentVarKey = v.key;
+          Array.from(varsWrap.children).forEach(function(el){ el.classList.remove('active'); });
+          b.classList.add('active');
+          render();
+        });
+        varsWrap.appendChild(b);
+      });
+    }
+
+    // ===== Precarga / detección de frames =====
+    function probeImage(url){
+      return new Promise(function(resolve){
+        var im = new Image();
+        im.onload  = function(){ resolve(true);  };
+        im.onerror = function(){ resolve(false); };
+        // Cache bust para evitar que el navegador recuerde 404
+        im.src = url + ((url.indexOf('?')===-1)?'?':'&') + 't=' + Date.now();
+      });
+    }
+
+    async function detectCount(prefix, suffix, start, hardCap){
+      var lo = start, hi = Math.min(start + 256, hardCap||240), ok = start-1;
+
+      // subida exponencial
+      var step = 1, i = start;
+      while (i <= hi){
+        /* eslint-disable no-await-in-loop */
+        var good = await probeImage(prefix + i + suffix);
+        if (!good) { hi = i - 1; break; }
+        ok = i;
+        step *= 2;
+        i += step;
+      }
+      if (hi < lo) hi = ok;
+
+      // búsqueda binaria
+      var left = Math.max(lo, start), right = Math.max(ok, hi);
+      while (left <= right){
+        var mid = Math.floor((left + right)/2);
+        /* eslint-disable no-await-in-loop */
+        var midOk = await probeImage(prefix + mid + suffix);
+        if (midOk){ ok = mid; left = mid + 1; }
+        else{ right = mid - 1; }
+      }
+      return Math.max(ok - start + 1, 0);
+    }
+
+    // ===== Secuencia =====
+    var playing=false, timer=null, speed=1000, idx=1, seqCfg=null;
+
+    function seqSrc(i){ return seqCfg.prefix + i + (seqCfg.suffix||'.jpg'); }
+    function seqUpdate(i){
+      idx = i; img.src = seqSrc(idx); range.value = idx; label.textContent = String(idx);
+      prefetchNext();
+    }
+    function seqStep(d){ var n = idx + d; if (n > seqCfg.end) n = seqCfg.start; if (n < seqCfg.start) n = seqCfg.end; seqUpdate(n); }
+    function seqPlay(){ if (playing) return; playing=true; btnPlay.textContent='⏸'; timer=setInterval(function(){ seqStep(1); }, speed); }
+    function seqPause(){ playing=false; btnPlay.textContent='▶︎'; if (timer){ clearInterval(timer); timer=null; } }
+
+    // Precarga simple
+    var prefetch = { queue:[], cache:[], setSize:12 };
+    function prefetchSet(start){
+      prefetch.queue = [];
+      var end = Math.min(seqCfg.end, start + prefetch.setSize - 1);
+      for (var k=start; k<=end; k++){ prefetch.queue.push(seqSrc(k)); }
+    }
+    function prefetchNext(){
+      if (!seqCfg) return;
+      var nextStart = idx + 1;
+      if (!prefetch.queue.length || prefetch.queue.indexOf(seqSrc(nextStart)) === -1){
+        prefetchSet(nextStart);
+      }
+      for (var m=0; m<3 && prefetch.queue.length; m++){
+        var u = prefetch.queue.shift();
+        var im = new Image(); im.src = u; prefetch.cache.push(im);
+        if (prefetch.cache.length > 60) prefetch.cache.shift();
+      }
+    }
+
+    async function showSequence(v){
+      frame.style.display='none'; img.style.display='block';
+      var start = v.start || 1;
+      var count = v.count; // puede ser null (tp24)
+      seqCfg = { prefix:v.prefix, suffix:(v.suffix||'.jpg'), start:start, end:null };
+
+      if (count == null){
+        updateStateLine('Detectando número de frames…');
+        count = await detectCount(seqCfg.prefix, seqCfg.suffix, start, 240);
+        if (count === 0){ updateStateLine('No hay imágenes disponibles'); return; }
+      }
+
+      seqCfg.end = start + count - 1;
+      range.min = seqCfg.start; range.max = seqCfg.end; range.step = 1;
+      label.textContent = String(start);
+      // muestra total /XX
+      label.nextSibling.nodeValue = '/' + (seqCfg.end - seqCfg.start + 1);
+
+      idx = seqCfg.start;
+      seqPause();
+      speed = parseInt(speedSel.value,10) || 1000;
+      seqUpdate(idx);
+      updateStateLine('Listo • ' + (seqCfg.end - seqCfg.start + 1) + ' frames');
+    }
+
+    // ===== Render principal =====
+    function render(){
+      btnGFS.setAttribute('aria-selected', currentModel==='gfs');
+      btnWRF.setAttribute('aria-selected', currentModel==='wrf');
+      btnEC.setAttribute('aria-selected',  currentModel==='ecmwf');
+
+      var v = getVar(currentModel, currentVarKey);
+      if (!v){ updateStateLine('Sin variable'); return; }
+      updateStateLine('Modelo: ' + currentModel.toUpperCase() + ' • Variable: ' + v.label);
+
+      if (v.type === 'page'){
+        seqPause();
+        img.style.display='none'; frame.style.display='block';
+        frame.src = v.page;
+        return;
+      }
+      showSequence(v);
+    }
+
+    // ===== Handlers modelo =====
+    btnGFS.addEventListener('click', function(){ currentModel='gfs'; currentVarKey=null; renderVarButtons(); render(); });
+    btnWRF.addEventListener('click', function(){ currentModel='wrf'; currentVarKey=null; renderVarButtons(); render(); });
+    btnEC.addEventListener('click',  function(){ currentModel='ecmwf'; currentVarKey=null; renderVarButtons(); render(); });
+
+    // Botón Meteograma
+    document.getElementById('openMeteograma').addEventListener('click', function(){
+      if (window.Meteo && Meteo.open) Meteo.open('ciudad-de-mexico');
+    });
+
+    // ===== Controles de animación =====
+    var playing=false;
+    var timer=null;
+    var speed=1000;
+    var idx=1;
+
+    var range = document.getElementById('frameRange');
+    var btnPrev = document.getElementById('btnPrev');
+    var btnNext = document.getElementById('btnNext');
+    var btnPlay = document.getElementById('btnPlay');
+    var speedSel = document.getElementById('speed');
+
+    range.addEventListener('input', function(){ seqPause(); seqUpdate(parseInt(this.value,10)); });
+    btnPrev.addEventListener('click', function(){ seqPause(); seqStep(-1); });
+    btnNext.addEventListener('click', function(){ seqPause(); seqStep(1); });
+    btnPlay.addEventListener('click', function(){ playing ? seqPause() : seqPlay(); });
+    speedSel.addEventListener('change', function(){ speed = parseInt(this.value,10)||1000; if (playing){ seqPause(); seqPlay(); } });
+    window.addEventListener('keydown', function(e){
+      if (e.target && (e.target.tagName==='INPUT' || e.target.tagName==='SELECT')) return;
+      if (e.key==='ArrowLeft'){ seqPause(); seqStep(-1); }
+      if (e.key==='ArrowRight'){ seqPause(); seqStep(1); }
+      if (e.key===' '){ e.preventDefault(); (playing?seqPause():seqPlay()); }
+    });
+
+    // Inicial
+    function renderVarButtons(){ /* redefinido arriba, no repetir */ }
+  })();
+  </script>
+</body>
+</html>
+
