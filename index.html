@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Pronósticos | GFS, WRF & ECMWF-IFS</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#f5f6f8; --panel:#fff; --text:#0f172a; --muted:#667085;
+      --accent:#334155; --border:#e5e7eb; --sidebar-w: 260px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial}
+
+    /* ===== Top bar / branding ===== */
+    .topbar{
+      position:sticky;
+      top:0;
+      z-index:60;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      padding:6px 12px;
+      background:#020617;
+      color:#e5e7eb;
+      box-shadow:0 4px 14px rgba(15,23,42,.55);
+    }
+    .topbar-left{display:flex;flex-direction:column;gap:2px;}
+    .brand{font-weight:700;font-size:1.02rem;}
+    .tagline{font-size:.82rem;color:#cbd5f5;}
+    .topbar-right{display:flex;align-items:center;gap:8px;}
+    .pill--dark{
+      background:rgba(15,23,42,.6);
+      color:#e5e7eb;
+      border:1px solid rgba(148,163,184,.7);
+      border-radius:999px;
+      padding:.28rem .6rem;
+      font-size:.8rem;
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+    }
+    .btn-ghost{
+      appearance:none;
+      border:1px solid rgba(148,163,184,.7);
+      background:transparent;
+      color:#e5e7eb;
+      padding:.35rem .7rem;
+      border-radius:999px;
+      font-weight:600;
+      font-size:.85rem;
+      cursor:pointer;
+    }
+    .btn-ghost:hover{background:rgba(15,23,42,.5);}
+    .link-small{
+      font-size:.8rem;
+      color:#cbd5f5;
+      text-decoration:none;
+      font-weight:500;
+    }
+    .link-small:hover{text-decoration:underline;}
+
+    .app{ display:grid; grid-template-columns: var(--sidebar-w) 1fr; grid-template-rows: 100vh; }
+
+    /* Sidebar */
+    .sidebar{ background: var(--panel); border-right:1px solid var(--border); display:flex; flex-direction:column; min-width: 220px; }
+    .side-head{padding:12px 14px;border-bottom:1px solid var(--border)}
+    .side-title{margin:0;font-weight:700;font-size:1.05rem}
+    .side-section{padding:12px 10px}
+    .label{font-size:.78rem;color:var(--muted);font-weight:700;margin:0 4px 6px 4px;text-transform:uppercase;letter-spacing:.04em}
+    .model-group{display:flex;gap:6px; padding:6px 8px; flex-wrap:wrap;}
+    .model-btn{ appearance:none; border:1px solid var(--border); background:#f8fafc; color:#1f2937; padding:.45rem .8rem; border-radius:999px; font-weight:700; font-size:.95rem; cursor:pointer; }
+    .model-btn[aria-selected="true"]{ background:var(--accent); color:#fff; border-color:var(--accent); }
+    .vars{display:grid; gap:6px; padding:6px 8px; overflow:auto}
+    .var-btn{ width:100%; text-align:left; appearance:none; border:1px solid var(--border); background:#fff; color:#1f2937; padding:.5rem .6rem; border-radius:10px; font-weight:600; font-size:.95rem; cursor:pointer; }
+    .var-btn.active{ background:#111827; color:#fff; border-color:#111827; }
+
+    /* Main panel */
+    .main{ display:flex; flex-direction:column; height:100vh; padding:10px 12px 12px; gap:10px; }
+    .topline{font-size:.9rem;color:var(--muted); padding:2px 2px 4px}
+
+    /* Viewer */
+    .viewer-card{
+      position:relative; flex: 1 1 auto; height: calc(100vh - 240px); min-height: 520px;
+      max-height: 1100px; border:1px solid var(--border); border-radius:12px; background:var(--panel);
+      box-shadow:0 10px 30px rgba(2,6,23,.06); display:flex; align-items:center; justify-content: center; overflow:hidden;
+      padding: 0;
+    }
+    #viewerImg{ width:100%; height:100%; object-fit:contain; display:block; background:#fff; }
+    #viewerFrame{ display:none; }
+
+    /* Controls */
+    .controls{
+      display:grid; grid-template-columns:auto 1fr auto auto;
+      gap:10px; align-items:center; border:1px solid var(--border); border-radius:12px;
+      background:var(--panel); padding:6px 10px; box-shadow:0 6px 18px rgba(0,0,0,.06);
+    }
+    .group{display:flex; gap:6px; align-items:center}
+    .btn{ appearance:none; border:1px solid var(--border); background:#f8fafc; color:var(--text); padding:.45rem .8rem; border-radius:999px; font-weight:700; font-size:.95rem; cursor:pointer; }
+    .btn:hover{ background:#eef2f7 }
+    .label{font-variant-numeric:tabular-nums}
+    input[type="range"]{ width:100%; appearance:none; height:6px; border-radius:999px; background:#e7edf5; outline:none; }
+    input[type="range"]::-webkit-slider-thumb{ appearance:none; width:18px; height:18px; border-radius:50%; background:var(--accent); border:2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.08); cursor:pointer; }
+    input[type="range"]::-moz-range-thumb{ width:18px; height:18px; border-radius:50%; background:var(--accent); border:2px solid #fff; cursor:pointer; }
+
+    @media (max-width: 880px){ :root{ --sidebar-w: 220px; } .var-btn, .model-btn, .btn{ font-size:.9rem } }
+    @media (max-width: 700px){
+      .app{ grid-template-columns: 1fr; grid-template-rows:auto auto 1fr; }
+      .sidebar{ grid-row:1; border-right:none; border-bottom:1px solid var(--border); }
+      .main{ grid-row:2 / span 2; }
+      .topbar{flex-direction:column;align-items:flex-start;gap:4px;}
+      .topbar-right{align-self:flex-end;}
+    }
+
+    /* ===== Meteograma (panel lateral) ===== */
+    .meteo-panel{
+      position: fixed; inset: 0 0 0 auto; width: min(760px, 98vw);
+      background: #fff; color: var(--text); border-left: 1px solid var(--border);
+      box-shadow: -12px 0 30px rgba(2,6,23,.12); transform: translateX(100%); transition: transform .28s ease;
+      display:flex; flex-direction:column; z-index: 50;
+    }
+    .meteo-panel.open{ transform: translateX(0); }
+    .meteo-head{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border-bottom:1px solid var(--border); }
+    .meteo-title{ margin:0; font-size:1.05rem }
+    .meteo-body{ padding:12px; overflow:auto; display:grid; gap:12px; grid-auto-rows:minmax(220px, auto); }
+    .meteo-body .card{ border:1px solid var(--border); border-radius:12px; background:#fff; padding:12px; box-shadow:0 6px 18px rgba(0,0,0,.06); }
+    .meteo-body .card h4{ margin:0 0 6px; font-size:.98rem; color:#111827 }
+    .meteo-body .cwrap { width: 100%; }
+    .meteo-body canvas { width: 100% !important; height: 100% !important; display:block; }
+    .cwrap{ width:100%; height: clamp(240px, 38vh, 420px); }
+    .meteo-foot{ padding:10px 12px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .pill{ background:#f1f5f9; color:#0f172a; border:1px solid #e2e8f0; border-radius:999px; padding:.3rem .6rem; font-size:.85rem; }
+    .link{ color:#334155; text-decoration:underline; font-weight:600 }
+    .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
+    select.city{border:1px solid var(--border); border-radius:10px; padding:.45rem .6rem; background:#fff; font-weight:600}
+  </style>
+</head>
+<body>
+
+  <!-- Barra superior de branding -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="brand">Pronósticos Numéricos</span>
+      <span class="tagline">Pronósticos de alta resolución para energía, agro y protección civil</span>
+    </div>
+    <div class="topbar-right">
+      <span id="runInfo" class="pill pill--dark">Modelo: WRF · Frame 1/168 · UTC</span>
+      <button id="tzToggle" class="btn-ghost" type="button">UTC</button>
+      <a href="#acerca" class="link-small">Acerca / Servicios</a>
+    </div>
+  </header>
+
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar" role="navigation" aria-label="Selector de modelo y variable">
+      <div class="side-head"><h2 class="side-title">Pronósticos Numéricos</h2></div>
+      <div class="side-section">
+        <div class="label">Modelo</div>
+        <div class="model-group">
+          <button id="btn-gfs" class="model-btn" role="tab" aria-selected="false">GFS</button>
+          <button id="btn-wrf" class="model-btn" role="tab" aria-selected="true">WRF</button>
+          <button id="btn-ecmwf-ifs" class="model-btn" role="tab" aria-selected="false">ECMWF-IFS</button>
+          <button id="btn-ecmwf-aifs" class="model-btn" role="tab" aria-selected="false">ECMWF-AIFS</button>
+        </div>
+      </div>
+      <div class="side-section" style="flex:1 1 auto; overflow:auto">
+        <div class="label">Variables</div>
+        <div id="vars" class="vars"></div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <div class="topline" id="stateLine">Listo</div>
+
+      <div class="viewer-card" id="viewerCard">
+        <img id="viewerImg" alt="Mapa pronóstico">
+        <iframe id="viewerFrame" title="Visor de variable"></iframe>
+      </div>
+
+      <!-- Controles -->
+      <div class="controls" id="controls">
+        <div class="group">
+          <button id="btnPrev" class="btn" type="button" aria-label="Anterior">⟨</button>
+          <button id="btnPlay" class="btn" type="button" aria-label="Reproducir/Pausar">▶︎</button>
+          <button id="btnNext" class="btn" type="button" aria-label="Siguiente">⟩</button>
+        </div>
+        <div class="group" style="gap:10px; flex:1 1 auto;">
+          <input id="frameRange" type="range" min="1" max="168" step="1" value="1" aria-label="Frame" />
+          <div class="label">
+            <span id="frameLabel">1</span>/<span id="frameTotal">168</span>
+          </div>
+        </div>
+        <div class="group">
+          <label for="speed" class="label" style="min-width:auto;">Vel:</label>
+          <select id="speed" class="btn" aria-label="Velocidad">
+            <option value="1000">1x</option>
+            <option value="500">2x</option>
+            <option value="250">4x</option>
+            <option value="150">6x</option>
+          </select>
+        </div>
+        <div class="group">
+          <button id="openMeteograma" class="btn" type="button">📈 Meteograma</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ===== Panel lateral METEOGRAMA ===== -->
+  <aside id="meteoPanel" class="meteo-panel" aria-label="Meteograma">
+    <div class="meteo-head">
+      <div class="row">
+        <h3 class="meteo-title" id="mtTitle" style="margin-right:6px">Meteograma</h3>
+        <select id="citySelect" class="city" title="Ciudad"></select>
+        <small id="mtMeta" class="pill"></small>
+      </div>
+      <button class="close btn" id="closeBtn">Cerrar</button>
+    </div>
+    <div class="meteo-body">
+      <div class="card"><h4>Temperatura 2 m (°C)</h4><div class="cwrap"><canvas id="cTemp"></canvas></div></div>
+      <div class="card"><h4>Precipitación (mm/h)</h4><div class="cwrap"><canvas id="cPpn"></canvas></div></div>
+      <div class="card"><h4>Viento 10 m (km/h)</h4><div class="cwrap"><canvas id="cWind"></canvas></div></div>
+      <div class="card"><h4>Humedad relativa (%)</h4><div class="cwrap"><canvas id="cRh"></canvas></div></div>
+    </div>
+    <div class="meteo-foot">
+      <span class="pill" id="mtRange">—</span>
+      <a class="link" id="deepLink" href="#">Compartir</a>
+    </div>
+  </aside>
+
+  <!-- meteograma -->
+  <script src="meteograma.js" defer></script>
+
+  <!-- Viewer -->
+  <script>
+  (function(){
+    // ===== Configuración por modelo/variable =====
+    var CONFIG = {
+      gfs: [
+        { key:'tpInt_gfs',   label:'GFS • Prec. por intervalo', type:'sequence', prefix:'tpInt_gfs/',   suffix:'.png', count:168, start:1 },
+        { key:'tpTotal_gfs', label:'GFS • Prec. acumulada',     type:'sequence', prefix:'tpTotal_gfs/', suffix:'.png', count:168, start:1 },
+        { key:'tp24_gfs',    label:'GFS • Prec. 24 h',          type:'sequence', prefix:'tp24_gfs/',    suffix:'.png', count:48,  start:1 },
+        { key:'t2m_gfs',     label:'GFS • Temp. 2 m',           type:'sequence', prefix:'t2m_gfs/',     suffix:'.png', count:168, start:1 },
+        { key:'wind10_gfs',  label:'GFS • Viento 10 m',         type:'sequence', prefix:'wind10_gfs/',  suffix:'.png', count:168, start:1 }
+      ],
+      wrf: [
+        { key:'precipitacion',            label:'Precipitación hora',    type:'sequence', prefix:'prcp/',        suffix:'.jpg', count:168, start:1 },
+        { key:'precipitacionacumulada',   label:'Prec. acumulada',       type:'sequence', prefix:'prcpacum/',    suffix:'.jpg', count:168, start:1 },
+        { key:'precipitacionacumulada24h',label:'Prec. 24 h',            type:'sequence', prefix:'prcpacum24h/', suffix:'.jpg', count:168, start:1 },
+        { key:'t2m',                      label:'Temperatura 2 m',       type:'sequence', prefix:'tmp/t2m',      suffix:'.jpg', count:168, start:1 },
+        { key:'viento',                   label:'Viento 10 m',           type:'sequence', prefix:'wind/',        suffix:'.jpg', count:168, start:1 },
+        { key:'humedadrelativa',          label:'Humedad rel.',          type:'sequence', prefix:'rh2m/',        suffix:'.jpg', count:168, start:1 },
+        { key:'saffirsimpson',            label:'Saffir-Simpson',        type:'sequence', prefix:'windsaffir/',  suffix:'.jpg', count:168, start:1 }
+      ],
+      "ecmwf-ifs": [
+        { key:'tpInt',    label:'ECMWF • Prec. por intervalo', type:'sequence', prefix:'tpInt/',    suffix:'.png', count:85, start:1, autoCount:true },
+        { key:'tpTotal',  label:'ECMWF • Prec. acumulada',     type:'sequence', prefix:'tpTotal/',  suffix:'.png', count:85, start:1, autoCount:true },
+        { key:'tp24',     label:'ECMWF • Prec. 24 h',          type:'sequence', prefix:'tp24/',     suffix:'.png', count:85, start:1, autoCount:true },
+        { key:'t2m',      label:'ECMWF • Temp. 2 m',           type:'sequence', prefix:'t2m/',      suffix:'.png', count:85, start:1, autoCount:true },
+        { key:'wind10',   label:'ECMWF • Viento 10 m',         type:'sequence', prefix:'wind10/',   suffix:'.png', count:85, start:1, autoCount:true },
+        { key:'gust',     label:'ECMWF • Rachas 10 m',         type:'sequence', prefix:'gust/',     suffix:'.png', count:85, start:1, autoCount:true } 
+      ],
+      "ecmwf-aifs": [
+        { key:'tpInt_aifs',    label:'ECMWF-AIFS • Prec. por intervalo', type:'sequence', prefix:'tpInt_aifs/',    suffix:'.png', count:67, start:1, autoCount:true },
+        { key:'tpTotal_aifs',  label:'ECMWF-AIFS • Prec. acumulada',     type:'sequence', prefix:'tpTotal_aifs/',  suffix:'.png', count:67, start:1, autoCount:true },
+        { key:'tp24_aifs',     label:'ECMWF-AIFS • Prec. 24 h',          type:'sequence', prefix:'tp24_aifs/',     suffix:'.png', count:67, start:1, autoCount:true },
+        { key:'t2m_aifs',      label:'ECMWF-AIFS • Temp. 2 m',           type:'sequence', prefix:'t2m_aifs/',      suffix:'.png', count:67, start:1, autoCount:true },
+        { key:'wind10_aifs',   label:'ECMWF-AIFS • Viento 10 m',         type:'sequence', prefix:'wind10_aifs/',   suffix:'.png', count:67, start:1, autoCount:true },
+        { key:'gust_aifs',     label:'ECMWF-AIFS • Rachas 10 m',         type:'sequence', prefix:'gust_aifs/',     suffix:'.png', count:67, start:1, autoCount:true } 
+      ]      
+    };
+
+    // ===== Estado global =====
+    var currentModel = 'gfs';
+    var currentVarKey = null;
+
+    var varsWrap = document.getElementById('vars');
+    var btnGFS = document.getElementById('btn-gfs');
+    var btnWRF = document.getElementById('btn-wrf');
+    var btnIFS = document.getElementById('btn-ecmwf-ifs');
+    var btnAIFS = document.getElementById('btn-ecmwf-aifs');
+
+    var img = document.getElementById('viewerImg');
+    var frame = document.getElementById('viewerFrame');
+    var stateLine = document.getElementById('stateLine');
+
+    var btnPrev = document.getElementById('btnPrev');
+    var btnPlay = document.getElementById('btnPlay');
+    var btnNext = document.getElementById('btnNext');
+    var range = document.getElementById('frameRange');
+    var label = document.getElementById('frameLabel');
+    var frameTotalEl = document.getElementById('frameTotal');
+    var speedSel = document.getElementById('speed');
+
+    var runInfoEl = document.getElementById('runInfo');
+    var tzToggle = document.getElementById('tzToggle');
+    var tzMode = 'UTC'; // o 'LT'
+
+    function updateStateLine(txt){ stateLine.textContent = txt; }
+    function getVarList(model){ return CONFIG[model] || []; }
+    function getVar(model, key){
+      var list = getVarList(model);
+      if (!list.length) return null;
+      if (!key) return list[0];
+      for (var i=0;i<list.length;i++) if (list[i].key===key) return list[i];
+      return list[0];
+    }
+
+    function renderVarButtons(){
+      varsWrap.innerHTML = '';
+      var list = getVarList(currentModel);
+      if (!list.length) return;
+      if (!currentVarKey || !list.some(function(v){return v.key===currentVarKey;})){
+        currentVarKey = list[0].key;
+      }
+      list.forEach(function(v){
+        var b = document.createElement('button');
+        b.className = 'var-btn' + (v.key === currentVarKey ? ' active' : '');
+        b.textContent = v.label;
+        b.setAttribute('data-key', v.key);
+        b.addEventListener('click', function(){
+          currentVarKey = v.key;
+          Array.from(varsWrap.children).forEach(function(el){ el.classList.remove('active'); });
+          b.classList.add('active');
+          render();
+        });
+        varsWrap.appendChild(b);
+      });
+    }
+
+    // ===== Resolución dinámica de número de frames =====
+    function resolveFrameCount(v, callback){
+      if (typeof v._frames === 'number' && v._frames > 0){
+        callback(v._frames);
+        return;
+      }
+
+      if (!v.autoCount){
+        v._frames = v.count || 168;
+        callback(v._frames);
+        return;
+      }
+
+      var url = v.prefix + 'frames.txt';
+      fetch(url)
+        .then(function(resp){
+          if (!resp.ok) throw new Error('no frames.txt');
+          return resp.text();
+        })
+        .then(function(text){
+          var n = parseInt(text.trim(), 10);
+          if (!Number.isFinite(n) || n <= 0) throw new Error('valor inválido');
+          v._frames = n;
+          callback(v._frames);
+        })
+        .catch(function(){
+          v._frames = v.count || 168;
+          callback(v._frames);
+        });
+    }
+
+    // ===== Secuencia =====
+    var playing=false, timer=null, speed=1000, idx=1, seqCfg=null;
+
+    function seqSrc(i){ return seqCfg.prefix + i + (seqCfg.suffix||'.jpg'); }
+
+    function modelPrettyName(model){
+      if (model === 'gfs') return 'GFS';
+      if (model === 'wrf') return 'WRF';
+      if (model === 'ecmwf-ifs') return 'ECMWF-IFS';
+      if (model === 'ecmwf-aifs') return 'ECMWF-AIFS';
+      return model.toUpperCase();
+    }
+
+    function updateRunInfo(){
+      if (!runInfoEl || !seqCfg) return;
+      var total = seqCfg.end - seqCfg.start + 1;
+      var frameIdx = idx - seqCfg.start + 1;
+      var modelName = modelPrettyName(currentModel);
+      var tzLabel = (tzMode === 'UTC') ? 'UTC' : 'hora local';
+      runInfoEl.textContent = modelName + ' · Frame ' + frameIdx + '/' + total + ' · ' + tzLabel;
+    }
+
+    function seqUpdate(i){
+      idx = i;
+      img.src = seqSrc(idx);
+      range.value = idx;
+      label.textContent = String(idx);
+      prefetchNext();
+      updateRunInfo();
+    }
+
+    function seqStep(d){
+      var n = idx + d;
+      if (n > seqCfg.end) n = seqCfg.start;
+      if (n < seqCfg.start) n = seqCfg.end;
+      seqUpdate(n);
+    }
+    function seqPlay(){
+      if (playing) return;
+      playing=true;
+      btnPlay.textContent='⏸';
+      timer=setInterval(function(){ seqStep(1); }, speed);
+    }
+    function seqPause(){
+      playing=false;
+      btnPlay.textContent='▶︎';
+      if (timer){ clearInterval(timer); timer=null; }
+    }
+
+    function showSequence(v){
+      frame.style.display='none';
+      img.style.display='block';
+
+      resolveFrameCount(v, function(frameCount){
+        var start = v.start || 1;
+        var count = frameCount || v.count || 168;
+
+        seqCfg = {
+          prefix: v.prefix,
+          suffix: v.suffix || '.jpg',
+          start: start,
+          end: start + count - 1
+        };
+
+        range.min = seqCfg.start;
+        range.max = seqCfg.end;
+        range.step = 1;
+
+        if (frameTotalEl){
+          frameTotalEl.textContent = String(seqCfg.end - seqCfg.start + 1);
+        }
+
+        seqPause();
+        speed = parseInt(speedSel.value,10) || 1000;
+        idx = seqCfg.start;
+        seqUpdate(idx);
+      });
+    }
+
+    range.addEventListener('input', function(){ seqPause(); seqUpdate(parseInt(this.value,10)); });
+    btnPrev.addEventListener('click', function(){ seqPause(); seqStep(-1); });
+    btnNext.addEventListener('click', function(){ seqPause(); seqStep(1); });
+    btnPlay.addEventListener('click', function(){ playing ? seqPause() : seqPlay(); });
+    speedSel.addEventListener('change', function(){ speed = parseInt(this.value,10)||1000; if (playing){ seqPause(); seqPlay(); } });
+
+    window.addEventListener('keydown', function(e){
+      if (e.target && (e.target.tagName==='INPUT' || e.target.tagName==='SELECT')) return;
+      if (e.key==='ArrowLeft'){ seqPause(); seqStep(-1); }
+      if (e.key==='ArrowRight'){ seqPause(); seqStep(1); }
+      if (e.key===' '){ e.preventDefault(); (playing?seqPause():seqPlay()); }
+    });
+
+    // Toggle UTC / hora local (por ahora solo cambia la etiqueta)
+    tzToggle.addEventListener('click', function(){
+      tzMode = (tzMode === 'UTC') ? 'LT' : 'UTC';
+      tzToggle.textContent = (tzMode === 'UTC') ? 'UTC' : 'LT';
+      updateRunInfo();
+    });
+
+    // ===== Precarga simple =====
+    var prefetch = { queue:[], cache:[], setSize:12 };
+    function prefetchSet(start){
+      prefetch.queue = [];
+      var end = Math.min(seqCfg.end, start + prefetch.setSize - 1);
+      for (var k=start; k<=end; k++){ prefetch.queue.push(seqSrc(k)); }
+    }
+    function prefetchNext(){
+      if (!seqCfg) return;
+      var nextStart = idx + 1;
+      if (!prefetch.queue.length || prefetch.queue.indexOf(seqSrc(nextStart)) === -1){
+        prefetchSet(nextStart);
+      }
+      for (var m=0; m<3 && prefetch.queue.length; m++){
+        var u = prefetch.queue.shift();
+        var im = new Image(); im.src = u; prefetch.cache.push(im);
+        if (prefetch.cache.length > 60) prefetch.cache.shift();
+      }
+    }
+
+    // ===== Render principal =====
+    function render(){
+      btnGFS.setAttribute('aria-selected', currentModel==='gfs');
+      btnWRF.setAttribute('aria-selected', currentModel==='wrf');
+      btnIFS.setAttribute('aria-selected', currentModel==='ecmwf-ifs');
+      btnAIFS.setAttribute('aria-selected', currentModel==='ecmwf-aifs');
+
+      var v = getVar(currentModel, currentVarKey);
+      if (!v){ updateStateLine('Sin variable'); return; }
+      updateStateLine('Modelo: ' + currentModel.toUpperCase() + ' • Variable: ' + v.label);
+
+      if (v.type === 'page'){
+        seqPause();
+        img.style.display='none'; frame.style.display='block';
+        frame.src = v.page;
+        return;
+      }
+      showSequence(v);
+    }
+
+    // ===== Handlers modelo =====
+    btnGFS.addEventListener('click', function(){ currentModel='gfs'; currentVarKey=null; renderVarButtons(); render(); });
+    btnWRF.addEventListener('click', function(){ currentModel='wrf'; currentVarKey=null; renderVarButtons(); render(); });
+    btnIFS.addEventListener('click', function(){ currentModel='ecmwf-ifs';  currentVarKey=null; renderVarButtons(); render(); });
+    btnAIFS.addEventListener('click', function(){ currentModel='ecmwf-aifs';currentVarKey=null; renderVarButtons(); render(); });
+
+    // Botón Meteograma
+    document.getElementById('openMeteograma').addEventListener('click', function(){
+      if (window.Meteo && Meteo.open) Meteo.open('ciudad-de-mexico');
+    });
+
+    // Inicial
+    renderVarButtons();
+    render();
+  })();
+  </script>
+
+  <!-- Sección simple para el link "Acerca / Servicios" -->
+  <section id="acerca" style="padding:16px 14px 40px;font-size:.9rem;color:#4b5563;">
+    <h2 style="margin:0 0 8px;font-size:1rem;">Acerca de este servicio</h2>
+    <p style="margin:0 0 4px;">
+      Plataforma experimental de pronóstico numérico para México que integra modelos GFS, WRF y ECMWF (IFS/AIFS),
+      orientada a apoyar la toma de decisiones en sectores como energía, agro y protección civil.
+    </p>
+    <p style="margin:4px 0 0;">
+      Para colaboración o servicios especializados de pronóstico, contáctame por los medios indicados en el sitio.
+    </p>
+  </section>
+</body>
+</html>
+

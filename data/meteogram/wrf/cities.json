@@ -1,0 +1,308 @@
+[
+  {
+    "name": "Acapulco",
+    "slug": "acapulco",
+    "lat": 16.8634,
+    "lon": -99.8901
+  },
+  {
+    "name": "Aguascalientes",
+    "slug": "aguascalientes",
+    "lat": 21.8823,
+    "lon": -102.2826
+  },
+  {
+    "name": "Cabo San Lucas",
+    "slug": "cabo-san-lucas",
+    "lat": 22.8905,
+    "lon": -109.9167
+  },
+  {
+    "name": "Campeche",
+    "slug": "campeche",
+    "lat": 19.8301,
+    "lon": -90.5349
+  },
+  {
+    "name": "Cancún",
+    "slug": "cancun",
+    "lat": 21.1619,
+    "lon": -86.8515
+  },
+  {
+    "name": "Chihuahua",
+    "slug": "chihuahua",
+    "lat": 28.632,
+    "lon": -106.0691
+  },
+  {
+    "name": "Ciudad de México",
+    "slug": "ciudad-de-mexico",
+    "lat": 19.433,
+    "lon": -99.133
+  },
+  {
+    "name": "Coatzacoalcos",
+    "slug": "coatzacoalcos",
+    "lat": 18.143,
+    "lon": -94.4411
+  },
+  {
+    "name": "Colima",
+    "slug": "colima",
+    "lat": 19.2433,
+    "lon": -103.725
+  },
+  {
+    "name": "Cuautla",
+    "slug": "cuautla",
+    "lat": 18.811,
+    "lon": -98.953
+  },
+  {
+    "name": "Cuernavaca",
+    "slug": "cuernavaca",
+    "lat": 18.9242,
+    "lon": -99.2216
+  },
+  {
+    "name": "Culiacán",
+    "slug": "culiacan",
+    "lat": 24.799,
+    "lon": -107.3897
+  },
+  {
+    "name": "Durango",
+    "slug": "durango",
+    "lat": 24.0277,
+    "lon": -104.6532
+  },
+  {
+    "name": "Ensenada",
+    "slug": "ensenada",
+    "lat": 31.8667,
+    "lon": -116.6
+  },
+  {
+    "name": "Guadalajara",
+    "slug": "guadalajara",
+    "lat": 20.6736,
+    "lon": -103.344
+  },
+  {
+    "name": "Hermosillo",
+    "slug": "hermosillo",
+    "lat": 29.0729,
+    "lon": -110.9559
+  },
+  {
+    "name": "Irapuato",
+    "slug": "irapuato",
+    "lat": 20.6742,
+    "lon": -101.3465
+  },
+  {
+    "name": "Juárez",
+    "slug": "juarez",
+    "lat": 31.6904,
+    "lon": -106.4245
+  },
+  {
+    "name": "La Paz",
+    "slug": "la-paz",
+    "lat": 24.1426,
+    "lon": -110.3128
+  },
+  {
+    "name": "León",
+    "slug": "leon",
+    "lat": 21.1223,
+    "lon": -101.68
+  },
+  {
+    "name": "Matamoros",
+    "slug": "matamoros",
+    "lat": 25.869,
+    "lon": -97.501
+  },
+  {
+    "name": "Mazatlán",
+    "slug": "mazatlan",
+    "lat": 23.2329,
+    "lon": -106.4062
+  },
+  {
+    "name": "Mérida",
+    "slug": "merida",
+    "lat": 20.9671,
+    "lon": -89.6237
+  },
+  {
+    "name": "Mexicali",
+    "slug": "mexicali",
+    "lat": 32.6245,
+    "lon": -115.4523
+  },
+  {
+    "name": "Monterrey",
+    "slug": "monterrey",
+    "lat": 25.6866,
+    "lon": -100.3161
+  },
+  {
+    "name": "Morelia",
+    "slug": "morelia",
+    "lat": 19.7008,
+    "lon": -101.1844
+  },
+  {
+    "name": "Naucalpan",
+    "slug": "naucalpan",
+    "lat": 19.4753,
+    "lon": -99.2379
+  },
+  {
+    "name": "Nezahualcóyotl",
+    "slug": "nezahualcoyotl",
+    "lat": 19.3995,
+    "lon": -99.0148
+  },
+  {
+    "name": "Nogales",
+    "slug": "nogales",
+    "lat": 31.3086,
+    "lon": -110.9422
+  },
+  {
+    "name": "Oaxaca",
+    "slug": "oaxaca",
+    "lat": 17.0732,
+    "lon": -96.7266
+  },
+  {
+    "name": "Pachuca",
+    "slug": "pachuca",
+    "lat": 20.1011,
+    "lon": -98.7591
+  },
+  {
+    "name": "Playa del Carmen",
+    "slug": "playa-del-carmen",
+    "lat": 20.6296,
+    "lon": -87.0739
+  },
+  {
+    "name": "Poza Rica",
+    "slug": "poza-rica",
+    "lat": 20.533,
+    "lon": -97.459
+  },
+  {
+    "name": "Puebla",
+    "slug": "puebla",
+    "lat": 19.0433,
+    "lon": -98.2019
+  },
+  {
+    "name": "Querétaro",
+    "slug": "queretaro",
+    "lat": 20.5888,
+    "lon": -100.3899
+  },
+  {
+    "name": "Reynosa",
+    "slug": "reynosa",
+    "lat": 26.0922,
+    "lon": -98.2777
+  },
+  {
+    "name": "Saltillo",
+    "slug": "saltillo",
+    "lat": 25.4232,
+    "lon": -101.0053
+  },
+  {
+    "name": "San Juan del Río",
+    "slug": "san-juan-del-rio",
+    "lat": 20.3875,
+    "lon": -100.0014
+  },
+  {
+    "name": "San Luis Potosí",
+    "slug": "san-luis-potosi",
+    "lat": 22.1565,
+    "lon": -100.9855
+  },
+  {
+    "name": "Tampico",
+    "slug": "tampico",
+    "lat": 22.2331,
+    "lon": -97.8611
+  },
+  {
+    "name": "Tepic",
+    "slug": "tepic",
+    "lat": 21.505,
+    "lon": -104.8918
+  },
+  {
+    "name": "Tijuana",
+    "slug": "tijuana",
+    "lat": 32.5149,
+    "lon": -117.0382
+  },
+  {
+    "name": "Tlalnepantla",
+    "slug": "tlalnepantla",
+    "lat": 19.5401,
+    "lon": -99.1944
+  },
+  {
+    "name": "Toluca",
+    "slug": "toluca",
+    "lat": 19.2826,
+    "lon": -99.6557
+  },
+  {
+    "name": "Torreón",
+    "slug": "torreon",
+    "lat": 25.5429,
+    "lon": -103.4068
+  },
+  {
+    "name": "Tuxtla Gutiérrez",
+    "slug": "tuxtla-gutierrez",
+    "lat": 16.7519,
+    "lon": -93.116
+  },
+  {
+    "name": "Uruapan",
+    "slug": "uruapan",
+    "lat": 19.411,
+    "lon": -102.061
+  },
+  {
+    "name": "Veracruz",
+    "slug": "veracruz",
+    "lat": 19.1738,
+    "lon": -96.1342
+  },
+  {
+    "name": "Villahermosa",
+    "slug": "villahermosa",
+    "lat": 17.9892,
+    "lon": -92.9475
+  },
+  {
+    "name": "Xalapa",
+    "slug": "xalapa",
+    "lat": 19.5333,
+    "lon": -96.9167
+  },
+  {
+    "name": "Zapopan",
+    "slug": "zapopan",
+    "lat": 20.7236,
+    "lon": -103.3848
+  }
+]
